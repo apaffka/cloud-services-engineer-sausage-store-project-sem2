@@ -1,4 +1,14 @@
 ---
+# Source: sausage-store/charts/backend-report/templates/secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: sausage-store-backend-report-secret
+type: Opaque
+stringData:
+  DB: "mongodb://root:rootpassword@mongodb:27017/sausage-store?authSource=admin"
+
+---
 # Source: sausage-store/charts/backend/templates/secret.yaml
 apiVersion: v1
 kind: Secret
@@ -17,6 +27,15 @@ metadata:
 type: Opaque
 stringData:
   POSTGRES_PASSWORD: "storepassword"
+---
+# Source: sausage-store/charts/backend-report/templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sausage-store-backend-report-conf
+data:
+  PORT: "8080"
+
 ---
 # Source: sausage-store/charts/backend/templates/configmap.yaml
 apiVersion: v1
@@ -100,6 +119,27 @@ data:
   POSTGRES_DB: "sausage-store"
   POSTGRES_USER: "store"
 ---
+# Source: sausage-store/charts/backend-report/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: sausage-store-backend-report
+  namespace: r-devops-magistracy-project-2sem-97971079
+  labels:
+    app.kubernetes.io/name: backend-report
+    app.kubernetes.io/instance: "sausage-store"
+    app.kubernetes.io/component: backend-report
+    app.kubernetes.io/part-of: sausage-store
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+  selector:
+    app: sausage-store-backend-report
+
+---
 # Source: sausage-store/charts/backend/templates/service.yaml
 apiVersion: v1
 kind: Service
@@ -146,6 +186,60 @@ spec:
       targetPort: 5432
   selector:
     app: postgresql
+---
+# Source: sausage-store/charts/backend-report/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sausage-store-backend-report
+  namespace: r-devops-magistracy-project-2sem-97971079
+  labels:
+    app.kubernetes.io/name: backend-report
+    app.kubernetes.io/instance: "sausage-store"
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: "Helm"
+    helm.sh/chart: "backend-report-0.1.0"
+    app.kubernetes.io/component: backend-report
+    app.kubernetes.io/part-of: sausage-store
+spec:
+  revisionHistoryLimit: 12
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: sausage-store-backend-report
+  template:
+    metadata:
+      labels:
+        app: sausage-store-backend-report
+    spec:
+      containers:
+        - name: backend-report
+          image: sausage-backend-report:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: sausage-store-backend-report-conf
+                  key: PORT
+            - name: DB
+              valueFrom:
+                secretKeyRef:
+                  name: sausage-store-backend-report-secret
+                  key: DB
+          resources:
+            limits:
+              cpu: 250m
+              memory: 128Mi
+            requests:
+              cpu: 50m
+              memory: 64Mi
+
 ---
 # Source: sausage-store/charts/backend/templates/deployment.yaml
 apiVersion: apps/v1
@@ -300,6 +394,28 @@ spec:
             items:
               - key: nginx.conf
                 path: nginx.conf 
+---
+# Source: sausage-store/charts/backend-report/templates/hpa.yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: sausage-store-backend-report-hpa
+  namespace: r-devops-magistracy-project-2sem-97971079
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: sausage-store-backend-report
+  minReplicas: 1
+  maxReplicas: 3
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 75
+
 ---
 # Source: sausage-store/charts/infra/templates/mongodb.yaml
 apiVersion: apps/v1

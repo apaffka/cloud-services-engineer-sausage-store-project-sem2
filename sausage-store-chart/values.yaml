@@ -82,12 +82,28 @@ backend:
             cpu: 1
             memory: 512Mi
 
-backend-report: {}
-### Опишите значения для backend-report
-### Приложение должно использовать стратегию Recreate
-### Приложение использует переменную PORT - порт, на котором оно запустится и DB - Uri-подключение к mongodb. 
-### DB положите в Secret, PORT в ConfigMap
-### Опишите HPA для backend-report
+backend-report:
+  image: sausage-backend-report:latest
+  replicas: 1
+  revisionHistoryLimit: 12
+  containerPort: 8080
+  env:
+    port: "8080"
+    db: mongodb://root:rootpassword@mongodb:27017/sausage-store?authSource=admin
+  strategy:
+    type: Recreate
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "50m"
+    limits:
+      memory: "128Mi"
+      cpu: "250m"
+
+  hpa:
+    minReplicas: 1
+    maxReplicas: 3
+    averageUtilization: 75
 
 infra:
   postgresql:
