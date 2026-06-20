@@ -65,8 +65,8 @@ jobs:
             platforms: linux/amd64
             push: true
             tags: |
-              ${{ secrets.DOCKER_USER }}/backend-report:latest
-              ${{ secrets.DOCKER_USER }}/backend-report:${{ env.VERSION }}
+              ${{ secrets.DOCKER_USER }}/sausage-backend-report:latest
+              ${{ secrets.DOCKER_USER }}/sausage-backend-report:${{ env.VERSION }}
 
   # Упаковываем helm-чарт и пушим его в Nexus
 #  add_helm_chart_to_nexus:
