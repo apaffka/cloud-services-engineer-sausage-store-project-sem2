@@ -15,8 +15,6 @@ metadata:
 spec:
   revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
   replicas: {{ .Values.replicas }}
-  strategy:
-    type: {{ .Values.strategy.type }}
   selector:
     matchLabels:
       app: {{ .Release.Name }}-{{ .Chart.Name }}
@@ -29,20 +27,8 @@ spec:
         - name: {{ .Chart.Name }}
           image: {{ .Values.image }}
           imagePullPolicy: {{ .Values.global.imagePullPolicy }}
-          resources:
-{{ toYaml .Values.resources | indent 12 }} 
           ports:
-            - name: {{ .Chart.Name }}
+            - name: http
               containerPort: {{ .Values.containerPort }}
-          volumeMounts:
-          - name: {{ .Release.Name }}-{{ .Chart.Name }}-conf
-            mountPath: /etc/nginx/{{ .Values.nginxConf }}
-            subPath: {{ .Values.nginxConf }}
-            readOnly: true
-      volumes:
-        - name: {{ .Release.Name }}-{{ .Chart.Name }}-conf
-          configMap:
-            name: {{ .Release.Name }}-{{ .Chart.Name }}-conf
-            items:
-              - key: {{ .Values.nginxConf }}
-                path: {{ .Values.nginxConf }} 
+          resources:
+{{ toYaml .Values.resources | indent 12 }}

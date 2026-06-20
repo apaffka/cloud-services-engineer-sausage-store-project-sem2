@@ -41,6 +41,9 @@ spec:
           ports:
             - name: postgresql
               containerPort: {{ .Values.postgresql.containerPort }}
+          env:
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
           envFrom:
             - configMapRef:
                 name: postgresql-conf

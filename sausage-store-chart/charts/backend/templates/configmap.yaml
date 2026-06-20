@@ -6,7 +6,7 @@ metadata:
 data:
   postgres_uri: {{ .Values.env.postgresUri | quote }}
   postgres_user: {{ .Values.env.postgresUser | quote }}
-  mongo_uri: {{ .Values.env.mongoUri | quote | quote }}
+  mongo_uri: {{ .Values.env.mongoUri | quote }}
   report_path: {{ .Values.env.reportPath | quote }}
   log_path: {{ .Values.env.logPath | quote }}
   vault_enabled: {{ .Values.env.vaultEnabled | quote }}
