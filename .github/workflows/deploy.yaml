@@ -10,9 +10,8 @@ env:
   NEXUS_HELM_REPO: ${{ secrets.NEXUS_HELM_REPO }}
   NEXUS_HELM_REPO_USER: ${{ secrets.NEXUS_HELM_REPO_USER }}
   NEXUS_HELM_REPO_PASSWORD: ${{ secrets.NEXUS_HELM_REPO_PASSWORD }}
-  SAUSAGE_STORE_NAMESPACE: r-devops-magistracy-project-2sem-97971079
-#  KUBE_CONFIG_B64: ${{ secrets.KUBE_CONFIG_B64 }}
-#  VAULT_TOKEN: ${{ secrets.VAULT_TOKEN }}
+  SAUSAGE_STORE_NAMESPACE: ${{ secrets.SAUSAGE_STORE_NAMESPACE }}
+  KUBE_CONFIG_B64: ${{ secrets.KUBE_CONFIG_B64 }}
 
 jobs:
   # Сборка и пуш образов в DockerHub
@@ -123,9 +122,11 @@ jobs:
           mkdir -p ~/.kube
           echo "${{ secrets.KUBE_CONFIG_B64 }}" | base64 -d > ~/.kube/config
           chmod 600 ~/.kube/config
-          
+
           kubectl config current-context
-          kubectl get namespace
+          kubectl config set-context --current --namespace="${{ env.SAUSAGE_STORE_NAMESPACE }}"
+
+          kubectl get pods
 
       - name: Download Helm chart from Nexus
         run: |
