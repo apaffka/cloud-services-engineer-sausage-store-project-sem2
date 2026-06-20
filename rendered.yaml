@@ -1,0 +1,440 @@
+---
+# Source: sausage-store/charts/backend/templates/secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: sausage-store-backend-secret
+type: Opaque
+stringData:
+  postgres_password: "storepassword"
+
+---
+# Source: sausage-store/charts/infra/templates/postgresql.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgresql-secret
+type: Opaque
+stringData:
+  POSTGRES_PASSWORD: "storepassword"
+---
+# Source: sausage-store/charts/backend/templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sausage-store-backend-conf
+data:
+  postgres_uri: "jdbc:postgresql://postgresql:5432/sausage-store"
+  postgres_user: "store"
+  mongo_uri: "\"mongodb://root:rootpassword@mongodb:27017/sausage-store?authSource=admin\""
+  report_path: "/logs/reports"
+  log_path: "/logs"
+  vault_enabled: "false"
+  
+---
+# Source: sausage-store/charts/frontend/templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sausage-store-frontend-conf
+data:
+  nginx.conf: |
+    user  nginx;
+    worker_processes  auto;
+    error_log  /var/log/nginx/error.log notice;
+    pid        /var/run/nginx.pid;
+    events {
+        worker_connections  1024;
+    }
+
+    http {
+        include       /etc/nginx/mime.types;
+        default_type  application/octet-stream;
+
+        log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+                          '$status $body_bytes_sent "$http_referer" '
+                          '"$http_user_agent" "$http_x_forwarded_for"';
+
+        access_log  /var/log/nginx/access.log  main;
+
+        sendfile        on;
+        keepalive_timeout  65;
+        server {
+
+          listen       80;
+
+          location / {
+              root   /usr/share/nginx/html;
+              index  index.html;
+              try_files $uri $uri/ /index.html;
+          }
+
+            location /api {
+              proxy_pass http://sausage-store-backend-service:8080;
+          }
+
+          error_page   500 502 503 504  /50x.html;
+          location = /50x.html {
+              root   /usr/share/nginx/html;
+          }
+      }
+
+    }
+
+---
+# Source: sausage-store/charts/infra/templates/mongodb.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mongodb-conf
+data:
+  MONGO_INITDB_ROOT_USERNAME: root
+  MONGO_INITDB_ROOT_PASSWORD: rootpassword
+---
+# Source: sausage-store/charts/infra/templates/postgresql.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgresql-conf
+data:
+  POSTGRES_DB: "sausage-store"
+  POSTGRES_USER: "store"
+---
+# Source: sausage-store/charts/backend/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: sausage-store-backend-service
+  labels:
+    app: sausage-store-backend-service
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      protocol: TCP
+      targetPort: 8080
+  selector:
+    app: sausage-store-backend
+---
+# Source: sausage-store/charts/infra/templates/mongodb.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb
+  labels:
+    app: mongodb
+spec:
+  ports:
+  - port: 27017
+    targetPort: 27017
+  selector:
+    app: mongodb
+  clusterIP: None
+---
+# Source: sausage-store/charts/infra/templates/postgresql.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgresql
+  labels:
+    app: postgresql
+spec:
+  type: ClusterIP
+  ports:
+    - name: postgresql
+      port: 5432
+      targetPort: 5432
+  selector:
+    app: postgresql
+---
+# Source: sausage-store/charts/backend/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sausage-store-backend
+  namespace: r-devops-magistracy-project-2sem-97971079
+  labels:
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/instance: "sausage-store"
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: "Helm"
+    helm.sh/chart: "backend-0.1.0"
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: sausage-store
+spec:
+  revisionHistoryLimit: 15
+  replicas: 1
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: sausage-store-backend
+  template:
+    metadata:
+      annotations:
+        prometheus.io/path: "/actuator/prometheus"
+        prometheus.io/port: "8080"
+        prometheus.io/scrape: "true"
+      labels:
+        app: sausage-store-backend
+    spec:
+      containers:
+        - name: backend
+          image: YOUR_DOCKERHUB/sausage-backend:latest
+          imagePullPolicy: Always
+          env:
+            - name: SPRING_DATASOURCE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: sausage-store-backend-conf
+                  key: postgres_uri
+
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: sausage-store-backend-conf
+                  key: postgres_user
+
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: sausage-store-backend-secret
+                  key: postgres_password
+
+            - name: SPRING_DATA_MONGODB_URI
+              valueFrom:
+                configMapKeyRef:
+                  name: sausage-store-backend-conf
+                  key: mongo_uri
+
+            - name: SPRING_CLOUD_VAULT_ENABLED
+              valueFrom:
+                configMapKeyRef:
+                  name: sausage-store-backend-conf
+                  key: vault_enabled
+
+            - name: REPORT_PATH
+              valueFrom:
+                configMapKeyRef:
+                  name: sausage-store-backend-conf
+                  key: report_path
+
+            - name: LOG_PATH
+              valueFrom:
+                configMapKeyRef:
+                  name: sausage-store-backend-conf
+                  key: log_path
+
+          resources:
+            limits:
+              cpu: "1"
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 256Mi
+          ports:
+            - name: backend
+              containerPort: 8080
+          livenessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 5
+---
+# Source: sausage-store/charts/frontend/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sausage-store-frontend
+  namespace: r-devops-magistracy-project-2sem-97971079
+  labels:
+    app.kubernetes.io/name: frontend
+    app.kubernetes.io/instance: "sausage-store"
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: "Helm"
+    helm.sh/chart: "frontend-0.1.0"
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/part-of: sausage-store
+spec:
+  revisionHistoryLimit: 15
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: sausage-store-frontend
+  template:
+    metadata:
+      labels:
+        app: sausage-store-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: YOUR_DOCKERHUB/sausage-frontend:latest
+          imagePullPolicy: Always
+          resources:
+            limits:
+              cpu: "1"
+              memory: 128Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi 
+          ports:
+            - name: frontend
+              containerPort: 80
+          volumeMounts:
+          - name: sausage-store-frontend-conf
+            mountPath: /etc/nginx/nginx.conf
+            subPath: nginx.conf
+            readOnly: true
+      volumes:
+        - name: sausage-store-frontend-conf
+          configMap:
+            name: sausage-store-frontend-conf
+            items:
+              - key: nginx.conf
+                path: nginx.conf 
+---
+# Source: sausage-store/charts/infra/templates/mongodb.yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongodb
+  annotations:
+    helm.sh/hook-weight: "-5"
+spec:
+  serviceName: mongodb
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongodb
+  template:
+    metadata:
+      labels:
+        app: mongodb
+    spec:
+      containers:
+      - name: mongodb
+        image: mongo:7.0
+        envFrom:
+          - configMapRef:
+              name: mongodb-conf
+        ports:
+        - containerPort: 27017
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+        volumeMounts:
+        - name: mongodb-data
+          mountPath: /data/db
+  volumeClaimTemplates:
+  - metadata:
+      name: mongodb-data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 1Gi
+---
+# Source: sausage-store/charts/infra/templates/postgresql.yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgresql
+  labels:
+    app: postgresql
+spec:
+  serviceName: postgresql
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgresql
+  template:
+    metadata:
+      labels:
+        app: postgresql
+    spec:
+      containers:
+        - name: postgresql
+          image: postgres:13-alpine
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: postgresql
+              containerPort: 5432
+          envFrom:
+            - configMapRef:
+                name: postgresql-conf
+            - secretRef:
+                name: postgresql-secret
+          resources:
+            limits:
+              cpu: 500m
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          volumeMounts:
+            - name: postgresql-data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: postgresql-data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+---
+# Source: sausage-store/charts/frontend/templates/ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sausage-store-frontend-ingress
+spec:
+  ingressClassName: "nginx"
+  tls:
+    - hosts:
+        - YOUR_STUDENT_HOSTNAME.students-projects.ru
+  rules:
+    - host: YOUR_STUDENT_HOSTNAME.students-projects.ru
+      http:
+        paths:
+        - path: /
+          pathType: Prefix
+          backend:
+            service:
+              name: sausage-store-frontend-service
+              port:
+                number: 80
+---
+# Source: sausage-store/charts/backend/templates/deployment.yaml
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: sausage-store-backend-vpa
+spec:
+  targetRef:
+    apiVersion: "apps/v1"
+    kind: Deployment
+    name: sausage-store-backend
+  updatePolicy:
+    updateMode: "Off"
+  resourcePolicy:
+    containerPolicies:
+    - containerName: backend
+      maxAllowed:
+        cpu: 1
+        memory: 512Mi
+      minAllowed:
+        cpu: 25m
+        memory: 128Mi

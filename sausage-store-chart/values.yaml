@@ -38,14 +38,19 @@ backend:
     postgresUri: jdbc:postgresql://postgresql:5432/sausage-store
     postgresUser: store
     postgresPassword: storepassword
+    mongoUri: mongodb://root:rootpassword@mongodb:27017/sausage-store?authSource=admin
     reportPath: /logs/reports
     logPath: /logs
+    vaultEnabled: "false"
   service:
     port: 8080
   revisionHistoryLimit: 15
   replicas: 1
   strategy:
-  ### Опишите стратегию RollingUpdate для бэкенда
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   image: YOUR_DOCKERHUB/sausage-backend:latest
   imagePullPolicy: Always
   resources:
@@ -57,11 +62,27 @@ backend:
       cpu: "1"
   containerPort: 8080
   livenessProbe:
-  ### Опишите LivenessProbe для бэкенда
+    httpGet:
+      path: /actuator/health
+      port: 8080
+    initialDelaySeconds: 60
+    periodSeconds: 30
+    timeoutSeconds: 5
+    failureThreshold: 3
   vpa:
-  ### Опишите VPA для бэкенда
+    updatePolicy:
+      updateMode: "Off"
+    resourcePolicy:
+      containerPolicies:
+        - containerName: backend
+          minAllowed:
+            cpu: 25m
+            memory: 128Mi
+          maxAllowed:
+            cpu: 1
+            memory: 512Mi
 
-backend-report:
+backend-report: {}
 ### Опишите значения для backend-report
 ### Приложение должно использовать стратегию Recreate
 ### Приложение использует переменную PORT - порт, на котором оно запустится и DB - Uri-подключение к mongodb. 
@@ -70,7 +91,19 @@ backend-report:
 
 infra:
   postgresql:
-  ### Опишите необходимые переменные для развертывания PostgresQL в кластере Kubernetes
+    image: postgres:13-alpine
+    containerPort: 5432
+    database: sausage-store
+    username: store
+    password: storepassword
+    storage: 1Gi
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "100m"
+      limits:
+        memory: "256Mi"
+        cpu: "500m"
   mongodb:
     env:
       MONGO_INITDB_ROOT_USERNAME: root
