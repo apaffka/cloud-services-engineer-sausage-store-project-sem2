@@ -42,7 +42,7 @@ jobs:
             context: ./backend/
             platforms: linux/amd64
             push: true
-            tags:
+            tags: |
               ${{ secrets.DOCKER_USER }}/sausage-backend:latest
               ${{ secrets.DOCKER_USER }}/sausage-backend:${{ env.VERSION }}
             build-args: |
@@ -54,7 +54,7 @@ jobs:
             context: ./frontend/
             platforms: linux/amd64
             push: true
-            tags:
+            tags: |
               ${{ secrets.DOCKER_USER }}/sausage-frontend:latest
               ${{ secrets.DOCKER_USER }}/sausage-frontend:${{ env.VERSION }}
 
@@ -64,7 +64,7 @@ jobs:
             context: ./backend-report/
             platforms: linux/amd64
             push: true
-            tags:
+            tags: |
               ${{ secrets.DOCKER_USER }}/sausage-frontend:latest
               ${{ secrets.DOCKER_USER }}/sausage-frontend:${{ env.VERSION }}
 
