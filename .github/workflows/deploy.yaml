@@ -104,3 +104,56 @@ jobs:
           curl -f -u "${{ secrets.NEXUS_HELM_REPO_USER }}:${{ secrets.NEXUS_HELM_REPO_PASSWORD }}" \
             --upload-file "$CHART_PACKAGE" \
             "${{ secrets.NEXUS_HELM_REPO }}/$CHART_FILE"
+
+
+  deploy_to_kubernetes:
+    name: Deploy Helm chart to Kubernetes
+    runs-on: ubuntu-latest
+    needs: upload_helm_chart_to_nexus
+
+    steps:
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG_B64 }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+          
+          kubectl config current-context
+          kubectl get namespace
+
+      - name: Download Helm chart from Nexus
+        run: |
+          mkdir -p helm-packages
+          
+          CHART_NAME="sausage-store"
+          CHART_FILE="${CHART_NAME}-${{ env.VERSION }}.tgz"
+          
+          curl -f -L -u "${{ secrets.NEXUS_HELM_REPO_USER }}:${{ secrets.NEXUS_HELM_REPO_PASSWORD }}" \
+            "${{ secrets.NEXUS_HELM_REPO }}/${CHART_FILE}" \
+            -o "helm-packages/${CHART_FILE}"
+          
+          ls -la helm-packages
+
+      - name: Deploy to Kubernetes
+        run: |
+          CHART_PACKAGE=$(ls helm-packages/*.tgz)
+          
+          helm upgrade --install sausage-store "$CHART_PACKAGE" \
+            --set backend.image=${{ secrets.DOCKER_USER }}/sausage-backend:${{ env.VERSION }} \
+            --set backend-report.image=${{ secrets.DOCKER_USER }}/sausage-backend-report:${{ env.VERSION }} \
+            --set frontend.image=${{ secrets.DOCKER_USER }}/sausage-frontend:${{ env.VERSION }}
+
+      - name: Check deployment status
+        run: |
+          kubectl get pods
+          kubectl get pvc
+          kubectl get svc
+          kubectl get ingress
+          kubectl get hpa
+          kubectl get vpa
