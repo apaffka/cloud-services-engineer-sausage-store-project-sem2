@@ -79,6 +79,10 @@ backend:
           maxAllowed:
             cpu: 1
             memory: 512Mi
+  vault:
+    enabled: true
+    uri: "https://www.agapovlab.ru"
+    approleSecretName: sausage-store-vault-approle
 
 backend-report:
   image: apaffka/sausage-backend-report:latest
