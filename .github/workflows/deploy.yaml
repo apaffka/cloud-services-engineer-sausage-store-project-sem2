@@ -23,7 +23,7 @@ jobs:
           # Получение исходного кода из репозитория
           uses: actions/checkout@v3
 
-        - name: Set up Dockercat sausage-store-chart/Chart.yaml Buildx
+        - name: Set up Docker Buildx
           # Установка сборщика контейнеров Docker
           uses: docker/setup-buildx-action@v2
         - name: Login to Docker 
@@ -104,7 +104,6 @@ jobs:
             --upload-file "$CHART_PACKAGE" \
             "${{ secrets.NEXUS_HELM_REPO }}/$CHART_FILE"
 
-
   deploy_to_kubernetes:
     name: Deploy Helm chart to Kubernetes
     runs-on: ubuntu-latest
@@ -127,6 +126,13 @@ jobs:
           kubectl config set-context --current --namespace="${{ env.SAUSAGE_STORE_NAMESPACE }}"
 
           kubectl get pods
+
+      - name: Create Vault AppRole secret
+        run: |
+          kubectl create secret generic sausage-store-vault-approle \
+            --from-literal=role-id="${{ secrets.VAULT_ROLE_ID }}" \
+            --from-literal=secret-id="${{ secrets.VAULT_SECRET_ID }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Download Helm chart from Nexus
         run: |

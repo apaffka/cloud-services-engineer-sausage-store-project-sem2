@@ -122,7 +122,6 @@ infra:
       limits:
         memory: "256Mi"
         cpu: "300m"
-  cpu: "500m"
   mongodb:
     image: mongo:7.0
     containerPort: 27017
